@@ -1,0 +1,41 @@
+{
+  "model_version": "risk-real-v2",
+  "best_model": "RandomForest",
+  "dataset": "rajanand/rainfall-in-india (IMD)",
+  "n_train": 3292,
+  "n_test": 824,
+  "features": [
+    "rainfall_deviation_pct",
+    "drought_index",
+    "flood_index",
+    "annual_rainfall_pct",
+    "monsoon_onset_deviation",
+    "cv_rainfall",
+    "consecutive_dry_months",
+    "rainfall_trend"
+  ],
+  "isolation_forest": {
+    "auc_roc": 0.721
+  },
+  "random_forest": {
+    "auc_roc": 1.0,
+    "cv_mean": 1.0,
+    "cv_std": 0.0
+  },
+  "feature_importance": {
+    "drought_index": 0.6968,
+    "rainfall_deviation_pct": 0.0918,
+    "annual_rainfall_pct": 0.0888,
+    "consecutive_dry_months": 0.0408,
+    "flood_index": 0.0372,
+    "cv_rainfall": 0.0246,
+    "rainfall_trend": 0.0114,
+    "monsoon_onset_deviation": 0.0086
+  },
+  "risk_thresholds": {
+    "low": 0.25,
+    "medium": 0.5,
+    "high": 0.75,
+    "critical": 0.9
+  }
+}

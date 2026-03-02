@@ -1,0 +1,65 @@
+{
+  "model_version": "xgboost-real-v2",
+  "dataset": "atharvaingle/crop-recommendation-dataset",
+  "n_samples": 2200,
+  "test_accuracy": 0.9932,
+  "num_classes": 22,
+  "classes": [
+    "apple",
+    "banana",
+    "blackgram",
+    "chickpea",
+    "coconut",
+    "coffee",
+    "cotton",
+    "grapes",
+    "jute",
+    "kidneybeans",
+    "lentil",
+    "maize",
+    "mango",
+    "mothbeans",
+    "mungbean",
+    "muskmelon",
+    "orange",
+    "papaya",
+    "pigeonpeas",
+    "pomegranate",
+    "rice",
+    "watermelon"
+  ],
+  "best_params": {
+    "colsample_bytree": 0.8,
+    "learning_rate": 0.15,
+    "max_depth": 6,
+    "n_estimators": 150,
+    "subsample": 1.0
+  },
+  "feature_importance": {
+    "rainfall": 0.1858,
+    "humidity": 0.1594,
+    "K": 0.1476,
+    "N": 0.1396,
+    "P": 0.1352,
+    "ph": 0.1198,
+    "temperature": 0.1125
+  },
+  "model_comparison": {
+    "Random Forest": {
+      "cv_mean": 0.9926,
+      "cv_std": 0.0061
+    },
+    "XGBoost": {
+      "cv_mean": 0.9943,
+      "cv_std": 0.0036
+    },
+    "KNN (k=5)": {
+      "cv_mean": 0.9653,
+      "cv_std": 0.0121
+    },
+    "Gradient Boosting": {
+      "cv_mean": 0.9875,
+      "cv_std": 0.0066
+    }
+  }
+}

@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables / secrets
+.env
+.env.*
+*.env
+kaggle.json
+
+# Node / Frontend
+node_modules/
+frontend/build/
+frontend/.cache/
+npm-debug.log*
+yarn-error.log*
+
+# ML model artifacts (large binary files — regenerate with train.py)
+backend/ml/**/*.pkl
+backend/ml/**/*.joblib
+backend/ml/**/*.model
+
+# Datasets (large files — download via Kaggle commands in DATASETS.md)
+backend/ml/data/*.csv
+
+# Plots / images (regenerated on training)
+backend/ml/**/artifacts/*.png
+
+# Terraform state
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/*.tfvars
+infrastructure/terraform/.terraform.lock.hcl
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+.docker/
+.claude/

@@ -1,0 +1,120 @@
+# AgroPulse AI - Local Development Stack
+# Includes: Backend API + PostgreSQL + LocalStack (AWS mocks)
+
+services:
+  # ─── Backend API ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: agropulse-api
+    ports:
+      - "8000:8000"
+    environment:
+      # App
+      APP_NAME: "AgroPulse AI"
+      ENVIRONMENT: "development"
+      DEBUG: "true"
+      ALLOWED_ORIGINS: '["http://localhost:3000","http://localhost:8080"]'
+
+      # Database (points to local postgres service)
+      DATABASE_URL: "postgresql+asyncpg://agropulse:password@postgres:5432/agropulse"
+
+      # AWS (points to LocalStack for local dev)
+      AWS_REGION: "ap-south-1"
+      AWS_ACCESS_KEY_ID: "test"
+      AWS_SECRET_ACCESS_KEY: "test"
+      AWS_ENDPOINT_URL: "http://localstack:4566"
+
+      # Cognito (use dummy values for local dev)
+      COGNITO_USER_POOL_ID: "ap-south-1_XXXXXXXXX"
+      COGNITO_CLIENT_ID: "local-client-id"
+
+      # S3 Buckets
+      S3_BUCKET_DATA: "agropulse-data-lake"
+      S3_BUCKET_MODELS: "agropulse-model-artifacts"
+
+      # OpenWeatherMap
+      OPENWEATHER_API_KEY: "${OPENWEATHER_API_KEY:-}"
+
+      # Bedrock (requires real AWS credentials with Bedrock access)
+      BEDROCK_MODEL_ID: "anthropic.claude-3-sonnet-20240229-v1:0"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app:ro  # Hot reload for development
+    restart: unless-stopped
+    networks:
+      - agropulse-net
+
+  # ─── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: agropulse-postgres
+    environment:
+      POSTGRES_DB: agropulse
+      POSTGRES_USER: agropulse
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agropulse -d agropulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agropulse-net
+
+  # ─── LocalStack (AWS Mock for local dev) ────────────────────────────────────
+  localstack:
+    image: localstack/localstack:3.4
+    container_name: agropulse-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3,dynamodb,cognito,secretsmanager,sqs,eventbridge,lambda
+      EAGER_SERVICE_LOADING: 1
+      LOCALSTACK_AUTH_TOKEN: "${LOCALSTACK_AUTH_TOKEN:-}"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agropulse-net
+
+  # ─── pgAdmin (optional DB UI) ──────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: agropulse-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@agropulse.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - dev-tools
+    networks:
+      - agropulse-net
+
+volumes:
+  postgres_data:
+  localstack_data:
+
+networks:
+  agropulse-net:
+    driver: bridge

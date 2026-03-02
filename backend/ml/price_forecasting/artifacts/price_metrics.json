@@ -1,0 +1,52 @@
+[
+  {
+    "commodity": "Wheat",
+    "n_records": 246,
+    "mae": 137.2,
+    "rmse": 155.32,
+    "mape": 5.44,
+    "current_price": 2505.04,
+    "forecast_14d": 2334.91,
+    "forecast_30d": 2248.43
+  },
+  {
+    "commodity": "Tomato",
+    "n_records": 154,
+    "mae": 2788.91,
+    "rmse": 3169.47,
+    "mape": 161.98,
+    "current_price": 2073.71,
+    "forecast_14d": 2798.26,
+    "forecast_30d": 3691.55
+  },
+  {
+    "commodity": "Onion",
+    "n_records": 647,
+    "mae": 709.64,
+    "rmse": 803.94,
+    "mape": 34.8,
+    "current_price": 1893.05,
+    "forecast_14d": 2106.62,
+    "forecast_30d": 2255.58
+  },
+  {
+    "commodity": "Potato",
+    "n_records": 737,
+    "mae": 503.2,
+    "rmse": 536.82,
+    "mape": 27.79,
+    "current_price": 2203.79,
+    "forecast_14d": 1692.88,
+    "forecast_30d": 1792.95
+  },
+  {
+    "commodity": "Rice",
+    "n_records": 62,
+    "mae": 9087.95,
+    "rmse": 11037.16,
+    "mape": 256.11,
+    "current_price": 3663.16,
+    "forecast_14d": 3793.89,
+    "forecast_30d": -2540.5
+  }
+]

@@ -16,9 +16,15 @@ import { predictAPI, explanationAPI } from '../services/api';
 import { FarmerFormData } from '../types';
 
 const INDIAN_STATES = [
-  'Andhra Pradesh', 'Bihar', 'Gujarat', 'Haryana', 'Karnataka',
-  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Odisha', 'Punjab',
-  'Rajasthan', 'Tamil Nadu', 'Telangana', 'Uttar Pradesh', 'West Bengal',
+  // States
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  // Union Territories
+  'Andaman & Nicobar', 'Chandigarh', 'Dadra & Nagar Haveli', 'Daman & Diu',
+  'Delhi', 'Jammu & Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
 ];
 
 const LANGUAGES = [
@@ -44,6 +50,7 @@ const schema = z.object({
   humidity: z.number().min(0).max(100),
   irrigation: z.boolean(),
   cropType: z.string().optional(),
+  season: z.string().default('Kharif'),
   language: z.string().default('en'),
 });
 
@@ -54,6 +61,32 @@ const STEPS = [
   { icon: Beaker, title: 'Soil Analysis', subtitle: 'NPK & pH values' },
   { icon: Cloud, title: 'Weather & Crop', subtitle: 'Climate data' },
 ];
+
+// Mean soil + climate values per crop from training dataset (Kaggle Crop Recommendation)
+const CROP_PRESETS: Record<string, { nitrogen: number; phosphorus: number; potassium: number; ph: number; temperature: number; humidity: number; rainfall: number }> = {
+  'Rice':       { nitrogen: 80,  phosphorus: 48,  potassium: 40,  ph: 6.4, temperature: 24, humidity: 82, rainfall: 236 },
+  'Wheat':      { nitrogen: 73,  phosphorus: 68,  potassium: 52,  ph: 6.8, temperature: 16, humidity: 65, rainfall: 65  },
+  'Maize':      { nitrogen: 77,  phosphorus: 48,  potassium: 20,  ph: 6.2, temperature: 23, humidity: 65, rainfall: 67  },
+  'Cotton':     { nitrogen: 118, phosphorus: 47,  potassium: 20,  ph: 6.9, temperature: 24, humidity: 80, rainfall: 71  },
+  'Sugarcane':  { nitrogen: 118, phosphorus: 38,  potassium: 16,  ph: 6.9, temperature: 27, humidity: 66, rainfall: 100 },
+  'Chickpea':   { nitrogen: 40,  phosphorus: 68,  potassium: 80,  ph: 7.3, temperature: 19, humidity: 17, rainfall: 80  },
+  'Lentil':     { nitrogen: 19,  phosphorus: 68,  potassium: 19,  ph: 6.9, temperature: 25, humidity: 65, rainfall: 46  },
+  'Groundnut':  { nitrogen: 25,  phosphorus: 55,  potassium: 30,  ph: 6.4, temperature: 24, humidity: 65, rainfall: 51  },
+  'Soybean':    { nitrogen: 20,  phosphorus: 68,  potassium: 20,  ph: 6.5, temperature: 29, humidity: 66, rainfall: 103 },
+  'Mungbean':   { nitrogen: 20,  phosphorus: 48,  potassium: 20,  ph: 6.7, temperature: 28, humidity: 84, rainfall: 48  },
+  'Blackgram':  { nitrogen: 40,  phosphorus: 68,  potassium: 20,  ph: 7.1, temperature: 30, humidity: 66, rainfall: 69  },
+  'Pigeonpeas': { nitrogen: 20,  phosphorus: 68,  potassium: 20,  ph: 5.8, temperature: 27, humidity: 48, rainfall: 152 },
+  'Jute':       { nitrogen: 78,  phosphorus: 47,  potassium: 40,  ph: 6.7, temperature: 25, humidity: 79, rainfall: 174 },
+  'Coconut':    { nitrogen: 22,  phosphorus: 17,  potassium: 31,  ph: 6.0, temperature: 27, humidity: 95, rainfall: 176 },
+  'Mango':      { nitrogen: 20,  phosphorus: 27,  potassium: 30,  ph: 5.8, temperature: 31, humidity: 50, rainfall: 95  },
+  'Banana':     { nitrogen: 100, phosphorus: 82,  potassium: 50,  ph: 6.0, temperature: 27, humidity: 80, rainfall: 105 },
+  'Grapes':     { nitrogen: 23,  phosphorus: 133, potassium: 200, ph: 6.0, temperature: 24, humidity: 82, rainfall: 70  },
+  'Apple':      { nitrogen: 21,  phosphorus: 134, potassium: 200, ph: 5.9, temperature: 23, humidity: 92, rainfall: 113 },
+  'Orange':     { nitrogen: 20,  phosphorus: 17,  potassium: 10,  ph: 7.0, temperature: 23, humidity: 93, rainfall: 110 },
+  'Papaya':     { nitrogen: 49,  phosphorus: 59,  potassium: 50,  ph: 6.7, temperature: 34, humidity: 92, rainfall: 144 },
+  'Pomegranate':{ nitrogen: 18,  phosphorus: 20,  potassium: 20,  ph: 6.5, temperature: 21, humidity: 90, rainfall: 108 },
+  'Watermelon': { nitrogen: 100, phosphorus: 17,  potassium: 50,  ph: 6.5, temperature: 25, humidity: 85, rainfall: 50  },
+};
 
 const InputField: React.FC<{
   label: string;
@@ -83,17 +116,18 @@ const FarmerInputForm: React.FC = () => {
     register,
     handleSubmit,
     trigger,
+    setValue,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       irrigation: true,
       language: 'en',
-      nitrogen: 90,
-      phosphorus: 42,
-      potassium: 43,
+      nitrogen: 50,
+      phosphorus: 50,
+      potassium: 50,
       ph: 6.5,
-      rainfall: 800,
+      rainfall: 150,
       temperature: 25,
       humidity: 65,
       landArea: 2,
@@ -132,11 +166,12 @@ const FarmerInputForm: React.FC = () => {
           area_hectares: data.landArea,
           soil_nitrogen: data.nitrogen,
           soil_ph: data.ph,
+          state: data.state,
+          season: data.season,
           weather_forecast: {
             temperature_celsius: data.temperature,
             rainfall_mm: data.rainfall / 12,
             humidity_percent: data.humidity,
-            sunshine_hours: 7.5,
           },
           irrigation: data.irrigation,
         }),
@@ -258,6 +293,35 @@ const FarmerInputForm: React.FC = () => {
                 <div className="p-3 bg-agro-green-50 rounded-xl text-sm text-agro-green-700">
                   💡 Get NPK values from your Soil Health Card (soilhealth.dac.gov.in)
                 </div>
+                {/* Crop Example Presets */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quick Fill — Typical values for a crop
+                  </label>
+                  <select
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-agro-green-400 outline-none bg-white text-sm"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const preset = CROP_PRESETS[e.target.value];
+                      if (!preset) return;
+                      setValue('nitrogen', preset.nitrogen);
+                      setValue('phosphorus', preset.phosphorus);
+                      setValue('potassium', preset.potassium);
+                      setValue('ph', preset.ph);
+                      setValue('temperature', preset.temperature);
+                      setValue('humidity', preset.humidity);
+                      setValue('rainfall', preset.rainfall);
+                    }}
+                  >
+                    <option value="">— or pick a crop to auto-fill —</option>
+                    {Object.keys(CROP_PRESETS).map(crop => (
+                      <option key={crop} value={crop}>{crop}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Fills typical soil & weather values for that crop. You can still edit them.
+                  </p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <InputField label="Nitrogen (N)" unit="kg/ha" error={errors.nitrogen?.message}>
                     <input {...register('nitrogen', { valueAsNumber: true })} type="number"
@@ -310,6 +374,15 @@ const FarmerInputForm: React.FC = () => {
                 <InputField label="Current/Target Crop (optional)">
                   <input {...register('cropType')} placeholder="e.g. Rice, Wheat, Cotton"
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-agro-green-400 outline-none" />
+                </InputField>
+                <InputField label="Cropping Season">
+                  <select {...register('season')}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-agro-green-400 outline-none bg-white">
+                    <option value="Kharif">Kharif (Jun – Nov, Monsoon)</option>
+                    <option value="Rabi">Rabi (Nov – Apr, Winter)</option>
+                    <option value="Zaid">Zaid (Mar – Jun, Summer)</option>
+                    <option value="Whole Year">Whole Year (Perennial)</option>
+                  </select>
                 </InputField>
                 <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
                   <input {...register('irrigation')} type="checkbox" id="irrigation"

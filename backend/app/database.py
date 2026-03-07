@@ -11,14 +11,17 @@ from app.config import settings
 
 logger = structlog.get_logger(__name__)
 
-# ─── PostgreSQL ───────────────────────────────────────────────────────────────
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    echo=settings.DEBUG,
-)
+# ─── PostgreSQL / SQLite ──────────────────────────────────────────────────────
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+_engine_kwargs: dict = {"echo": settings.DEBUG}
+if not _is_sqlite:
+    _engine_kwargs.update({
+        "pool_size": settings.DATABASE_POOL_SIZE,
+        "max_overflow": settings.DATABASE_MAX_OVERFLOW,
+        "pool_pre_ping": True,
+    })
+
+engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
@@ -46,9 +49,12 @@ async def get_db():
 
 async def init_db():
     """Initialize database tables (idempotent — safe to call on every startup)"""
-    async with engine.begin() as conn:
-        await conn.run_sync(lambda c: Base.metadata.create_all(c, checkfirst=True))
-    logger.info("database.initialized")
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(lambda c: Base.metadata.create_all(c, checkfirst=True))
+        logger.info("database.initialized")
+    except Exception as e:
+        logger.warning("database.init_failed", error=str(e), detail="Running without DB — predictions still work")
 
 
 async def close_db():

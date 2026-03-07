@@ -30,6 +30,8 @@ class RiskAssessmentRequest(BaseModel):
     district: str
     state: str
     crop: Optional[str] = None
+    annual_rainfall_mm: Optional[float] = Field(None, description="Annual rainfall at farm location (mm)")
+    temperature_celsius: Optional[float] = Field(None, description="Average temperature (°C)")
 
 
 class RiskAssessmentResponse(BaseModel):

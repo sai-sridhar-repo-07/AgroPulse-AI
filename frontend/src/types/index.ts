@@ -54,6 +54,8 @@ export interface YieldPredictionRequest {
   area_hectares: number;
   soil_nitrogen: number;
   soil_ph: number;
+  state?: string;
+  season?: string;
   weather_forecast: WeatherForecast;
   irrigation: boolean;
   fertilizer_type?: string;

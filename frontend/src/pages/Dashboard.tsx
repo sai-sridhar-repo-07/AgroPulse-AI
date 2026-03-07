@@ -1,9 +1,9 @@
 /**
  * AgroPulse AI - Main Dashboard (Beautiful Grid Layout)
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Leaf, LogOut, RefreshCw, Bell, ArrowLeft, MapPin, Sparkles } from 'lucide-react';
+import { Leaf, LogOut, RefreshCw, Bell, ArrowLeft, MapPin, Sparkles, AlertTriangle, CloudRain, TrendingDown, Bug, X, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authAPI, alertsAPI } from '../services/api';
 import CropRecommendationCard from '../components/dashboard/CropRecommendationCard';
@@ -28,6 +28,8 @@ const Dashboard: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [farmerName, setFarmerName] = useState('Farmer');
   const [location, setLocation] = useState('');
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const crop = sessionStorage.getItem('crop_result');
@@ -48,9 +50,26 @@ const Dashboard: React.FC = () => {
 
     if (!crop) loadDemoData();
 
-    alertsAPI.getAlerts('demo-farmer-001')
+    // Pass state + rainfall so alerts are location-aware
+    const fd = sessionStorage.getItem('farmer_data');
+    const farmerInfo = fd ? JSON.parse(fd) : {};
+    const state = farmerInfo.state || '';
+    const rainfall = farmerInfo.rainfall || 800;
+    alertsAPI.getAlerts('demo-farmer-001', state, rainfall)
       .then(res => setAlerts(res.alerts))
-      .catch(() => {});
+      .catch(() => {
+        // Fallback: show generic alerts if backend unreachable
+        setAlerts([{
+          id: 'fallback-1',
+          alert_type: 'weather',
+          severity: 'medium',
+          title: 'Connect backend to see live alerts',
+          message: 'Start the backend server to get real-time weather, pest, and market alerts for your location.',
+          risk_score: 0.3,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        }]);
+      });
   }, []);
 
   const loadDemoData = () => {
@@ -133,6 +152,25 @@ const Dashboard: React.FC = () => {
     setAlerts(demoAlerts);
   };
 
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    if (showNotifications) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showNotifications]);
+
+  const handleBellClick = () => {
+    setShowNotifications(v => !v);
+    // Mark all as read when panel opens
+    if (!showNotifications) {
+      setAlerts(prev => prev.map(a => ({ ...a, is_read: true })));
+    }
+  };
+
   const handleLogout = () => {
     authAPI.logout();
     sessionStorage.clear();
@@ -167,14 +205,102 @@ const Dashboard: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-white/60 rounded-lg transition-all">
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold animate-pulse-slow">
-                  {unreadCount}
-                </span>
+            {/* Notification Bell + Dropdown */}
+            <div className="relative" ref={notifRef}>
+              <button
+                onClick={handleBellClick}
+                className={`relative p-2 rounded-lg transition-all ${showNotifications ? 'bg-white/80 text-gray-700' : 'text-gray-500 hover:text-gray-700 hover:bg-white/60'}`}
+              >
+                <Bell className="w-4 h-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] flex items-center justify-center font-bold animate-pulse-slow">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown Panel */}
+              {showNotifications && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                  {/* Panel Header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-semibold text-gray-800">Notifications</span>
+                    </div>
+                    <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Alert List */}
+                  <div className="max-h-96 overflow-y-auto divide-y divide-gray-50">
+                    {alerts.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 py-8 px-4 text-center">
+                        <CheckCircle className="w-8 h-8 text-agro-green-400" />
+                        <p className="text-sm font-medium text-gray-700">All Clear</p>
+                        <p className="text-xs text-gray-400">No active alerts for your farm area.</p>
+                      </div>
+                    ) : (
+                      alerts.map(alert => {
+                        const iconMap: Record<string, React.ReactNode> = {
+                          weather: <CloudRain className="w-4 h-4" />,
+                          market: <TrendingDown className="w-4 h-4" />,
+                          pest: <Bug className="w-4 h-4" />,
+                        };
+                        const colorMap: Record<string, string> = {
+                          critical: 'text-red-500 bg-red-50',
+                          high: 'text-orange-500 bg-orange-50',
+                          medium: 'text-yellow-600 bg-yellow-50',
+                          low: 'text-blue-500 bg-blue-50',
+                        };
+                        const badgeMap: Record<string, string> = {
+                          critical: 'bg-red-100 text-red-700',
+                          high: 'bg-orange-100 text-orange-700',
+                          medium: 'bg-yellow-100 text-yellow-700',
+                          low: 'bg-blue-100 text-blue-700',
+                        };
+                        const iconStyle = colorMap[alert.severity] || colorMap.low;
+                        return (
+                          <div key={alert.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${iconStyle}`}>
+                              {iconMap[alert.alert_type] || <AlertTriangle className="w-4 h-4" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <p className="text-xs font-semibold text-gray-800 truncate">{alert.title}</p>
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0 ${badgeMap[alert.severity] || badgeMap.low}`}>
+                                  {alert.severity.toUpperCase()}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-gray-500 leading-snug line-clamp-2">{alert.message}</p>
+                            </div>
+                            <button
+                              onClick={() => setAlerts(a => a.filter(x => x.id !== alert.id))}
+                              className="text-gray-300 hover:text-gray-500 flex-shrink-0 mt-1"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {alerts.length > 0 && (
+                    <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50">
+                      <button
+                        onClick={() => { setAlerts([]); setShowNotifications(false); }}
+                        className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        Clear all notifications
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
-            </button>
+            </div>
+
             <button
               onClick={handleLogout}
               className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"

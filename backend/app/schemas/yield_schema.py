@@ -17,6 +17,8 @@ class YieldPredictionRequest(BaseModel):
     area_hectares: float = Field(..., gt=0, le=1000, description="Farm area in hectares")
     soil_nitrogen: float = Field(..., ge=0, le=200)
     soil_ph: float = Field(..., ge=3.0, le=10.0)
+    state: Optional[str] = Field(None, description="Indian state name")
+    season: Optional[str] = Field(None, description="Kharif | Rabi | Zaid | Whole Year")
     weather_forecast: WeatherForecast
     irrigation: bool = Field(True, description="Is irrigation available?")
     fertilizer_type: Optional[str] = Field(None, description="e.g. 'organic', 'chemical', 'mixed'")

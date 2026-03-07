@@ -43,8 +43,13 @@ async def get_current_user(
 ) -> dict:
     """
     Dependency: Validate JWT and return user context.
-    Raises 401 if token is missing or invalid.
+    In development (no Cognito configured), returns a mock user.
+    Raises 401 if token is missing or invalid in production.
     """
+    # Local dev bypass — no Cognito pool configured
+    if not settings.COGNITO_USER_POOL_ID:
+        return {"sub": "local-dev-user", "email": "dev@agropulse.local", "username": "devuser"}
+
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

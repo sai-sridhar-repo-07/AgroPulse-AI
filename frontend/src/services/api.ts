@@ -113,8 +113,10 @@ export const predictAPI = {
 
 // ─── Alerts API ───────────────────────────────────────────────────────────────
 export const alertsAPI = {
-  getAlerts: async (farmerId: string): Promise<AlertListResponse> => {
-    const res = await apiClient.get(`/alerts/${farmerId}`);
+  getAlerts: async (farmerId: string, state: string = '', rainfallMm: number = 800): Promise<AlertListResponse> => {
+    const res = await apiClient.get(`/alerts/${farmerId}`, {
+      params: { state, rainfall_mm: rainfallMm },
+    });
     return res.data;
   },
 };

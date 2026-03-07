@@ -4,63 +4,139 @@ GET /alerts/{farmer_id}
 """
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Path, Request
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Request, Query
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.schemas.alert import AlertListResponse, AlertResponse, RiskAssessmentRequest, RiskAssessmentResponse
 from app.services.sagemaker_service import sagemaker_service
-from app.database import get_db
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+
+def _build_alerts(state: str = "", rainfall_mm: float = 800.0) -> list[AlertResponse]:
+    """Build dynamic alerts based on state and rainfall — no hardcoded single set."""
+    alerts = []
+
+    # Drought alert — triggered when rainfall < 60% of state normal
+    state_normals = {
+        "rajasthan": 531, "gujarat": 832, "haryana": 617, "punjab": 649,
+        "maharashtra": 1177, "karnataka": 1139, "andhra pradesh": 934,
+        "telangana": 934, "madhya pradesh": 1017, "uttar pradesh": 991,
+        "kerala": 3055, "west bengal": 1582, "assam": 2818, "odisha": 1489,
+        "bihar": 1326, "jharkhand": 1422, "chhattisgarh": 1292,
+        "tamil nadu": 998, "himachal pradesh": 1469, "uttarakhand": 1530,
+    }
+    normal = state_normals.get(state.lower(), 900.0)
+
+    rain_ratio = rainfall_mm / normal
+
+    if rain_ratio < 0.6:
+        alerts.append(AlertResponse(
+            id=str(uuid.uuid4()),
+            alert_type="weather",
+            severity="high",
+            title="Drought Risk — Below Normal Rainfall",
+            message=f"Your area received {rainfall_mm:.0f}mm against normal {normal:.0f}mm "
+                    f"({rain_ratio*100:.0f}% of normal). High drought risk for standing crops. "
+                    f"Consider drip irrigation and mulching immediately.",
+            risk_score=round(1 - rain_ratio, 2),
+            is_read=False,
+            created_at=datetime.now(timezone.utc),
+            metadata={"rainfall_mm": rainfall_mm, "normal_mm": normal, "ratio_pct": round(rain_ratio*100, 1)},
+        ))
+    elif rain_ratio > 1.3:
+        alerts.append(AlertResponse(
+            id=str(uuid.uuid4()),
+            alert_type="weather",
+            severity="high",
+            title="Flood Risk — Excess Rainfall",
+            message=f"Rainfall is {rain_ratio*100:.0f}% of normal ({rainfall_mm:.0f}mm vs {normal:.0f}mm). "
+                    f"Ensure field drainage channels are clear. Risk of waterlogging and root rot.",
+            risk_score=round(min(0.95, (rain_ratio - 1) / 2), 2),
+            is_read=False,
+            created_at=datetime.now(timezone.utc),
+            metadata={"rainfall_mm": rainfall_mm, "normal_mm": normal, "ratio_pct": round(rain_ratio*100, 1)},
+        ))
+    elif rain_ratio < 0.8:
+        alerts.append(AlertResponse(
+            id=str(uuid.uuid4()),
+            alert_type="weather",
+            severity="medium",
+            title="Below Normal Rainfall — Monitor Crops",
+            message=f"Rainfall is {rain_ratio*100:.0f}% of normal. Monitor soil moisture closely "
+                    f"and irrigate if needed. Rabi sowing may be delayed.",
+            risk_score=round(1 - rain_ratio, 2),
+            is_read=False,
+            created_at=datetime.now(timezone.utc),
+            metadata={"rainfall_mm": rainfall_mm, "normal_mm": normal},
+        ))
+
+    # Market alert — always relevant
+    alerts.append(AlertResponse(
+        id=str(uuid.uuid4()),
+        alert_type="market",
+        severity="low",
+        title="Commodity Price Alert",
+        message="Wheat & paddy MSP revised upward by 5.4% for 2024-25. "
+                "Register on e-NAM portal (enam.gov.in) for better mandi prices.",
+        risk_score=0.20,
+        is_read=True,
+        created_at=datetime.now(timezone.utc),
+        metadata={"source": "CACP MSP notification", "commodity": "wheat,paddy"},
+    ))
+
+    # Pest alert — seasonal
+    current_month = datetime.now().month
+    if 6 <= current_month <= 10:   # Kharif season
+        alerts.append(AlertResponse(
+            id=str(uuid.uuid4()),
+            alert_type="pest",
+            severity="medium",
+            title="Kharif Pest Advisory",
+            message="High humidity increases Fall Armyworm and Brown Plant Hopper risk in maize and paddy. "
+                    "Inspect crops weekly. Contact your local KVK for bio-pesticide options.",
+            risk_score=0.45,
+            is_read=False,
+            created_at=datetime.now(timezone.utc),
+            metadata={"pests": ["fall_armyworm", "brown_plant_hopper"], "season": "kharif"},
+        ))
+    elif current_month >= 11 or current_month <= 3:  # Rabi season (Nov-Mar)
+        alerts.append(AlertResponse(
+            id=str(uuid.uuid4()),
+            alert_type="pest",
+            severity="low",
+            title="Rabi Crop Advisory",
+            message="Watch for aphids and yellow rust in wheat. Early morning scouting recommended. "
+                    "Apply fungicide if rust coverage exceeds 5% of leaf area.",
+            risk_score=0.25,
+            is_read=True,
+            created_at=datetime.now(timezone.utc),
+            metadata={"pests": ["aphids", "yellow_rust"], "season": "rabi"},
+        ))
+
+    return alerts
 
 
 @router.get(
     "/{farmer_id}",
     response_model=AlertListResponse,
     summary="Get Farmer Alerts",
-    description="Returns all active risk alerts for a farmer, including weather, pest, and market alerts.",
+    description="Returns active risk alerts — weather, pest, and market — based on location and rainfall.",
 )
 async def get_alerts(
     request: Request,
-    farmer_id: str = Path(..., description="Farmer UUID"),
-    db: AsyncSession = Depends(get_db),
+    farmer_id: str,
+    state: str = Query(default="", description="Farmer's state for localised alerts"),
+    rainfall_mm: float = Query(default=800.0, description="Annual rainfall at farm (mm)"),
 ):
-    """Retrieve active alerts for a specific farmer"""
-    # In production: query from RDS/DynamoDB based on farmer_id
-    # Here we return sample alerts with realistic data
-    sample_alerts = [
-        AlertResponse(
-            id=str(uuid.uuid4()),
-            alert_type="weather",
-            severity="medium",
-            title="Heavy Rainfall Expected",
-            message="Moderate to heavy rainfall (45-65mm) expected in your district in the next 72 hours. Protect standing crops and ensure proper drainage.",
-            risk_score=0.58,
-            is_read=False,
-            created_at=datetime.now(timezone.utc),
-            metadata={"rainfall_expected_mm": 55, "duration_hours": 72},
-        ),
-        AlertResponse(
-            id=str(uuid.uuid4()),
-            alert_type="market",
-            severity="low",
-            title="Wheat Price Declining",
-            message="Wheat prices are projected to decline by 3-5% over the next 14 days. Consider selling soon if you have surplus stock.",
-            risk_score=0.32,
-            is_read=False,
-            created_at=datetime.now(timezone.utc),
-            metadata={"commodity": "wheat", "projected_change_pct": -4.2},
-        ),
-    ]
-
+    alerts = _build_alerts(state=state, rainfall_mm=rainfall_mm)
     return AlertListResponse(
         farmer_id=farmer_id,
-        total_alerts=len(sample_alerts),
-        unread_count=sum(1 for a in sample_alerts if not a.is_read),
-        alerts=sample_alerts,
+        total_alerts=len(alerts),
+        unread_count=sum(1 for a in alerts if not a.is_read),
+        alerts=alerts,
     )
 
 
@@ -70,9 +146,5 @@ async def get_alerts(
     summary="Comprehensive Risk Assessment",
 )
 @limiter.limit("10/minute")
-async def assess_risk(
-    request: Request,
-    payload: RiskAssessmentRequest,
-):
-    """Run AI-powered risk assessment for a farmer's location and crop"""
+async def assess_risk(request: Request, payload: RiskAssessmentRequest):
     return await sagemaker_service.assess_risk(payload)

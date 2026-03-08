@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: agropulse-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./agropulse.db
+      - key: AWS_REGION
+        value: ap-south-1
+      - key: AWS_ACCESS_KEY_ID
+        value: placeholder
+      - key: AWS_SECRET_ACCESS_KEY
+        value: placeholder
+      - key: COGNITO_USER_POOL_ID
+        value: ""
+      - key: COGNITO_CLIENT_ID
+        value: ""
+      - key: ALLOWED_ORIGINS
+        value: '["https://agropulse-ai.netlify.app","http://localhost:3000"]'
+    healthCheckPath: /health/

@@ -29,8 +29,8 @@ frontend/.cache/
 npm-debug.log*
 yarn-error.log*
 
-# ML model artifacts (large binary files — regenerate with train.py)
-backend/ml/**/*.pkl
+# ML model artifacts — keep trained artifacts, ignore only raw large binaries
+# backend/ml/**/*.pkl  ← included so cloud deploys work without retraining
 backend/ml/**/*.joblib
 backend/ml/**/*.model
 

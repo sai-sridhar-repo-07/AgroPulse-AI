@@ -258,20 +258,20 @@ def compare_models(X_train, y_train):
     cv = KFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
     models = {
         "XGBoost": xgb.XGBRegressor(
-            n_estimators=300, max_depth=6, learning_rate=0.08,
+            n_estimators=150, max_depth=5, learning_rate=0.1,
             subsample=0.8, colsample_bytree=0.8,
             random_state=RANDOM_STATE, n_jobs=-1
         ),
         "Random Forest": RandomForestRegressor(
-            n_estimators=200, max_depth=None,
+            n_estimators=80, max_depth=12,
             min_samples_leaf=5, random_state=RANDOM_STATE, n_jobs=-1
         ),
         "Gradient Boosting": GradientBoostingRegressor(
-            n_estimators=300, max_depth=5, learning_rate=0.08,
+            n_estimators=150, max_depth=5, learning_rate=0.1,
             subsample=0.8, random_state=RANDOM_STATE
         ),
         "Extra Trees": ExtraTreesRegressor(
-            n_estimators=200, random_state=RANDOM_STATE, n_jobs=-1
+            n_estimators=80, max_depth=12, random_state=RANDOM_STATE, n_jobs=-1
         ),
     }
 

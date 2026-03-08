@@ -66,3 +66,5 @@ htmlcov/
 # Docker
 .docker/
 .claude/
+backend/agropulse_dev.db
+*.db
